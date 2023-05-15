@@ -1,0 +1,11 @@
+# Updated-At: 2023-05-11T03:11:00.000Z
+Contact: mailto:security@tnet.moe
+Contact: mailto:oss@tnet.moe
+Expires: 2024-01-01T00:01:00.000Z
+Encryption: https://security.tnet.moe/encryption/pgp-key.txt
+Acknowledgments: https://security.tnet.moe/acknowledgments
+Preferred-Languages: en
+Canonical: https://security.tnet.moe/security.txt
+Policy: https://security.tnet.moe/policy
+Policy: https://security.tnet.moe/policy.txt
+Hiring: https://security.tnet.moe/jobs

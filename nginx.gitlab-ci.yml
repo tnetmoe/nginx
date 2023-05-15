@@ -1,0 +1,102 @@
+stages:
+  - build
+  - test
+  - publish
+  - dast
+  - performance
+
+.docker_build: &docker_build
+  image: docker:latest
+  stage: build
+  services:
+    - docker:dind
+  tags:
+    - docker
+  before_script:
+    - docker info
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" ${CI_REGISTRY}
+    - export BASE_TAG="build-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}-$(echo ${CI_PIPELINE_CREATED_AT} | cut -d "T" -f1)-${NGINX_VERSION}-${NGINX_BRANCH}-${DISTRO}"
+  script:
+    - docker build -t ${CI_REGISTRY_IMAGE}:${BASE_TAG} -f images/nginx/${DISTRO}/Dockerfile --build-arg NGINX_VERSION=${NGINX_VERSION} .
+    - docker push ${CI_REGISTRY_IMAGE}:${BASE_TAG}
+
+.docker_publish: &docker_publish
+  image: docker:latest
+  stage: publish
+  services:
+    - docker:dind
+  tags:
+    - docker
+  needs:
+    - Docker Build
+  dependencies:
+    - Docker Build
+  before_script:
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" ${CI_REGISTRY}
+    - export BASE_TAG="build-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}-$(echo ${CI_PIPELINE_CREATED_AT} | cut -d "T" -f1)-${NGINX_VERSION}-${NGINX_BRANCH}-${DISTRO}"
+    - docker pull ${CI_REGISTRY_IMAGE}:${BASE_TAG}
+
+Docker Build:
+  <<: *docker_build
+
+Docker Publish:
+  <<: *docker_publish
+  only:
+    - main
+  script:
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_BRANCH}-${DISTRO}
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_VERSION}-${NGINX_BRANCH}-${DISTRO}
+    - docker push $CI_REGISTRY_IMAGE --all-tags
+
+Docker Publish Stable Tags:
+  <<: *docker_publish
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DISTRO == "debian" && $NGINX_BRANCH == "stable"'
+  script:
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:nginx
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_VERSION}
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_BRANCH}
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${DISTRO}
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_VERSION}-${NGINX_BRANCH}
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_VERSION}-${DISTRO}
+    - docker push $CI_REGISTRY_IMAGE --all-tags
+
+Docker Publish Mainline Tags:
+  <<: *docker_publish
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DISTRO == "debian" && $NGINX_BRANCH == "mainline"'
+  script:
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_BRANCH}
+    - docker tag ${CI_REGISTRY_IMAGE}:${BASE_TAG} ${CI_REGISTRY_IMAGE}:${NGINX_VERSION}-${NGINX_BRANCH}
+    - docker push $CI_REGISTRY_IMAGE --all-tags
+
+include:
+  - template: Jobs/Code-Quality.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Jobs/Code-Quality.gitlab-ci.yml
+  - template: Jobs/Code-Intelligence.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Jobs/Code-Intelligence.gitlab-ci.yml
+  - template: Jobs/Browser-Performance-Testing.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Jobs/Browser-Performance-Testing.gitlab-ci.yml
+  - template: Security/DAST.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Security/DAST.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Jobs/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/License-Scanning.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Jobs/License-Scanning.gitlab-ci.yml
+  - template: Jobs/SAST.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml  # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Jobs/Secret-Detection.gitlab-ci.yml
+
+browser_performance:
+  needs:
+    - Docker Build
+  variables:
+    URL: http://nginx:8080
+  services: # use services to link your app container to the dast job
+    - name: ${CI_REGISTRY_IMAGE}:${BASE_TAG}
+      alias: nginx
+
+dast:
+  dependencies: []
+  needs:
+    - Docker Build
+  variables:
+    DAST_WEBSITE: http://nginx:8080
+    DAST_FULL_SCAN_ENABLED: "true" # do a full scan
+    DAST_BROWSER_SCAN: "true" # use the browser-based GitLab DAST crawler
+  services: # use services to link your app container to the dast job
+    - name: ${CI_REGISTRY_IMAGE}:${BASE_TAG}
+      alias: nginx
