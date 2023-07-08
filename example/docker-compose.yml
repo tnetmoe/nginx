@@ -16,6 +16,7 @@ services:
     read_only: true
     volumes:
       - ./data/logs:/var/log/nginx:rw
+      - ./config:/etc/nginx/config:ro
     tmpfs:
       - "/tmp:exec,uid=0,gid=0"
     logging:
