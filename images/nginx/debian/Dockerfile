@@ -19,7 +19,7 @@ USER root
 RUN ["rm", "-r", "/etc/nginx/nginx.conf", "/etc/nginx/conf.d", "/usr/share/nginx/html"]
 COPY ["/nginx/config/nginx.conf", "/etc/nginx/nginx.conf"]
 COPY ["/nginx/config/default.conf", "/etc/nginx/config/default.conf"]
-COPY ["/nginx/www/", "/usr/share/nginx/html/"]
+COPY ["/nginx/www/", "/usr/share/nginx"]
 
 STOPSIGNAL SIGQUIT
 USER nginx
