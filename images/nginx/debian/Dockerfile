@@ -17,8 +17,8 @@ COPY --from=debian ["/bin/rm", "./rm"]
 USER root
 # Modify default nginx.
 RUN ["rm", "-r", "/etc/nginx/nginx.conf", "/etc/nginx/conf.d", "/usr/share/nginx/html"]
-COPY ["/nginx/config/default/nginx.conf", "/etc/nginx/nginx.conf"]
-COPY ["/nginx/config/default/default.conf", "/etc/nginx/config/default.conf"]
+COPY ["/nginx/config/nginx.conf", "/etc/nginx/nginx.conf"]
+COPY ["/nginx/config/default.conf", "/etc/nginx/config/default.conf"]
 COPY ["/nginx/www/", "/usr/share/nginx/html/"]
 
 STOPSIGNAL SIGQUIT
