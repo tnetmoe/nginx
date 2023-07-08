@@ -1,0 +1,33 @@
+services:
+  nginx:
+    container_name: "nginx"
+    image: registry.gitlab.com/tnet.moe/infra/nginx:1.24-stable
+    networks:
+      - nginx
+    restart: "unless-stopped"
+    cap_drop:
+      - "ALL"
+    cap_add:
+      - "CAP_CHOWN"
+      #- "CAP_DAC_OVERRIDE"
+      - "CAP_SETGID"
+      - "CAP_SETUID"
+      - "CAP_NET_BIND_SERVICE"
+    read_only: true
+    volumes:
+      - ./data/logs:/var/log/nginx:rw
+    tmpfs:
+      - "/tmp:exec,uid=0,gid=0"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00" # 1 = core
+          memory: "1G" # 1 1G = 1GB ram
+networks:
+  nginx:
+    driver: bridge
+    name: nginx
